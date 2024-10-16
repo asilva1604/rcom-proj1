@@ -6,11 +6,12 @@
 // MISC
 #define _POSIX_SOURCE 1 // POSIX compliant source
 
-int seconds = 3
-int attempts = 3
+int seconds = 3;
+int attempts = 3;
 int alarmEnabled = FALSE;
 int alarmCount = 0;
 unsigned char BCC2 = 0;
+unsigned char currentFrame = 0;
 
 #define F 0x7E
 #define A1 0x03
@@ -138,8 +139,7 @@ void updateState(unsigned char byte) {
         break;
     case DATA:
         if (byte == F) {
-            if (BCC2 == 0) state = END;
-            else state = START;
+            state = END;
         }
         break;
     case END:
@@ -183,9 +183,66 @@ int llwrite(const unsigned char *buf, int bufSize)
 ////////////////////////////////////////////////
 int llread(unsigned char *packet)
 {
-    // TODO
+    unsigned char byte;
+    int readBytes = 0;
+    int ret = readByteSerialPort(&byte);
+    int esc = 0;
+    int succ = 1;
+    if (ret == 1) {
+        updateState(byte);
+        if (state == DATA) {
+            if (byte == 0x7d) {
+                esc = 1;
+            }
+            else if (byte == 0x5e && esc) {
+                packet[readBytes] = 0x7e;
+                readBytes++;
+                BCC2^=0x7e;
+                esc = 0;
+            }
+            else if (byte == 0x5d && esc) {
+                packet[readBytes] = 0x7d;
+                readBytes++;
+                BCC2^=0x7d;
+                esc = 0;
+            }
+            else if (esc) {
+                packet[readBytes] = byte;
+                readBytes++;
+                esc = 0;
+                BCC2^=byte;
+            }
+            } else {
+                packet[readBytes] = byte;
+                readBytes++;
+                BCC2^=byte;
+                esc = 0;
+            }
+        }
+        if (state == END) {
+            if (BCC2 != 0) {
+                unsigned char rej[5];
+                rej[0] = F;
+                rej[1] = A1;
+                if (currentFrame == 0) {
+                    rej[2] = Crej0;
+                } else rej[2] = Crej1;
+                rej[3] = rej[1] ^ rej[2];
+                rej[4] = F;
+                writeBytesSerialPort(rej, 5);
+                succ = 0;
+            }
+            state = START;
+        }
+    }
 
-    return 0;
+    if (succ) {
+        if (currentFrame == 0) currentFrame = 1;
+        else currentFrame = 0;
+    }
+
+    BCC2 = 0;
+    return readBytes;
 }
 
 ////////////////////////////////////////////////
