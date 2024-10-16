@@ -212,7 +212,7 @@ int llread(unsigned char *packet)
                 esc = 0;
                 BCC2^=byte;
             }
-            } else {
+            else {
                 packet[readBytes] = byte;
                 readBytes++;
                 BCC2^=byte;
