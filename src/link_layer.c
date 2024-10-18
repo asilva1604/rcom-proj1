@@ -6,8 +6,8 @@
 // MISC
 #define _POSIX_SOURCE 1 // POSIX compliant source
 
-int seconds = 3
-int attempts = 3
+int seconds = 3;
+int attempts = 3;
 int alarmEnabled = FALSE;
 int alarmCount = 0;
 unsigned char BCC2 = 0;
