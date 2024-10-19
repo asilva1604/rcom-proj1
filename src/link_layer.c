@@ -12,7 +12,7 @@ int attempts = 3;
 int alarmEnabled = FALSE;
 int alarmCount = 0;
 unsigned char BCC2 = 0;
-static unsigned char currentFrame = 0; //this needs to be static, no?
+static int currentFrame = 0; //this needs to be static, no?
 
 #define F 0x7E
 #define A1 0x03
@@ -26,6 +26,8 @@ static unsigned char currentFrame = 0; //this needs to be static, no?
 #define Cdisc 0x0B
 #define Cframe0 0x00
 #define Cframe1 0x80
+#define ESC 0x7D
+#define BStuff 0x20
 
 enum STATE {
     START,
@@ -153,6 +155,15 @@ void updateState(unsigned char byte) {
     }
 }
 
+// Alarm function handler
+void alarmHandler(int signal)
+{
+    alarmEnabled = FALSE;
+    alarmCount++;
+
+    printf("Alarm #%d\n", alarmCount);
+}
+
 ////////////////////////////////////////////////
 // LLOPEN
 ////////////////////////////////////////////////
@@ -174,9 +185,80 @@ int llopen(LinkLayer connectionParameters)
 ////////////////////////////////////////////////
 int llwrite(const unsigned char *buf, int bufSize)
 {
-    // TODO
+    // Start Frame
+    unsigned char frame[MAX_PAYLOAD_SIZE * 2 + 6];
+    frame[0] = F;
+    frame[1] = A1;
+    frame[2] = (currentFrame == 0)? Cframe0 : Cframe1;
+    frame[3] = (currentFrame == 0)? (A1^Cframe0) : (A1^Cframe1);
+    int frameSize = 4;
 
-    return 0;
+    // Create BCC2 and add payload to Frame with byte stuffing
+    BCC2 = 0;
+    for (int i = 0; i < bufSize; i++)
+    {
+        BCC2 ^= buf[i];
+
+        if (buf[i] == ESC || buf[i] == F) {
+            frame[frameSize] = ESC;
+            frameSize++;
+            frame[frameSize] = BStuff ^ buf[i];
+        } else {
+            frame[frameSize] = buf[i];
+        }
+        frameSize++;
+    }
+    if (BCC2 == ESC || BCC2 == F) {
+        frame[frameSize] = ESC;
+        frameSize++;
+        frame[frameSize] = BStuff ^ BCC2;
+    } else {
+        frame[frameSize] = BCC2;
+    }
+    frameSize++;
+
+    // Complete Frame
+    frame[frameSize] = F;
+    frameSize++;
+
+    unsigned char byte[1];
+    while (alarmCount < attempts)
+    {
+        if (alarmEnabled == FALSE)
+        {
+            int bytes = writeBytesSerialPort(frame, frameSize);
+            printf("%d bytes written\n", bytes);
+            if (bytes < frameSize) {
+                printf("ERROR: bytes written (%d) is less than the packet size (%d)\n", bytes, frameSize);
+            }
+            alarm(seconds); // Set alarm to be triggered in seconds
+            alarmEnabled = TRUE;
+        }
+        if (readByteSerialPort(byte) == 1) {
+            updateState(byte[0]);
+            printf("Byte: 0x%02X --> State: %d\n", byte[0], state);
+            if (state == END) {
+                if (currentFrame == 0 && stateMachine == ERROR0 || currentFrame == 1 && stateMachine == ERROR1) {
+                    // Send same frame again
+                    state = START;
+                    alarm(0);
+                    alarmEnabled = FALSE;
+                    alarmCount = 0;
+                } else if (currentFrame == 0 && stateMachine == SEND1 || currentFrame == 1 && stateMachine == SEND0) {
+                    // Return good
+                    state = START;
+                    alarm(0);
+                    alarmEnabled = FALSE;
+                    alarmCount = 0;
+                    return frameSize - 6; // Size of payload after byte stufing
+                } else {
+                    // RECEIVED STRANGE CODE
+                    printf("WARNING: Received unidentified Frame!\n");
+                }
+            }
+        }
+    }
+    return -1;
 }
 
 ////////////////////////////////////////////////
