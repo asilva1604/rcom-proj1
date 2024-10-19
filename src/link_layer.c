@@ -2,6 +2,7 @@
 
 #include "link_layer.h"
 #include "serial_port.h"
+#include <stdio.h>
 
 // MISC
 #define _POSIX_SOURCE 1 // POSIX compliant source
@@ -11,7 +12,7 @@ int attempts = 3;
 int alarmEnabled = FALSE;
 int alarmCount = 0;
 unsigned char BCC2 = 0;
-unsigned char currentFrame = 0;
+static unsigned char currentFrame = 0; //this needs to be static, no?
 
 #define F 0x7E
 #define A1 0x03
@@ -185,10 +186,18 @@ int llread(unsigned char *packet)
 {
     unsigned char byte;
     int readBytes = 0;
-    int ret = readByteSerialPort(&byte);
     int esc = 0;
-    int succ = 1;
-    if (ret == 1) {
+    while (TRUE) {
+        int check = readByteSerialPort(&byte);
+        if (check == -1) {
+            puts("Error on read, returning...\n");
+            return -1;
+        }
+        else if (check == 0) {
+            puts("No byte read, continuing...\n");
+            continue;
+        }
+        puts("1 byte read, processing...\n");
         updateState(byte);
         if (state == DATA) {
             if (byte == 0x7d) {
@@ -224,24 +233,28 @@ int llread(unsigned char *packet)
                 unsigned char rej[5];
                 rej[0] = F;
                 rej[1] = A1;
-                if (currentFrame == 0) {
+                if (stateMachine == DATA0) { //I think this makes more sense, no?
                     rej[2] = Crej0;
                 } else rej[2] = Crej1;
                 rej[3] = rej[1] ^ rej[2];
                 rej[4] = F;
                 writeBytesSerialPort(rej, 5);
-                succ = 0;
+                state = START;
+                BCC2 = 0;
             }
-            state = START;
+            else {
+                unsigned char ack[5];
+                ack[0] = F;
+                ack[1] = A1;
+                ack[2] = stateMachine == DATA0 ? Crr1 : Crr0;
+                ack[3] = ack[1] ^ ack[2];
+                ack[4] = F;
+                writeBytesSerialPort(ack, 5);
+                break;
+            }
         }
     }
 
-    if (succ) {
-        if (currentFrame == 0) currentFrame = 1;
-        else currentFrame = 0;
-    }
-
-    BCC2 = 0;
     return readBytes;
 }
 
