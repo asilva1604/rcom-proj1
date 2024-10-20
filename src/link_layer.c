@@ -12,7 +12,7 @@ int attempts = 3;
 int alarmEnabled = FALSE;
 int alarmCount = 0;
 unsigned char BCC2 = 0;
-static int currentFrame = 0; //this needs to be static, no?
+static int currentFrame = 0;
 
 #define F 0x7E
 #define A1 0x03
@@ -266,77 +266,63 @@ int llwrite(const unsigned char *buf, int bufSize)
 ////////////////////////////////////////////////
 int llread(unsigned char *packet)
 {
-    unsigned char byte;
+    unsigned char byte[1];
     int readBytes = 0;
-    int esc = 0;
+    int esc = FALSE;
+    BCC2 = 0;
     while (TRUE) {
-        int check = readByteSerialPort(&byte);
-        if (check == -1) {
-            puts("Error on read, returning...\n");
-            return -1;
-        }
-        else if (check == 0) {
-            puts("No byte read, continuing...\n");
-            continue;
-        }
-        puts("1 byte read, processing...\n");
-        updateState(byte);
-        if (state == DATA) {
-            if (byte == 0x7d) {
-                esc = 1;
+        if (readByteSerialPort(byte) == 1) {
+            updateState(byte[0]);
+            printf("Byte: 0x%02X --> State: %d\n", byte[0], state);
+            if (state == DATA) {
+                if (byte[0] == ESC) {
+                    esc = TRUE;
+                }
+                else if (esc && (byte[0] == BStuff ^ F || byte[0] == BStuff ^ ESC)) {
+                    packet[readBytes] = BStuff ^ byte[0];
+                    readBytes++;
+                    BCC2 ^= BStuff ^ byte[0];
+                    esc = FALSE;
+                }
+                else {
+                    packet[readBytes] = byte[0];
+                    readBytes++;
+                    BCC2 ^= byte[0];
+                    esc = FALSE;
+                }
             }
-            else if (byte == 0x5e && esc) {
-                packet[readBytes] = 0x7e;
-                readBytes++;
-                BCC2^=0x7e;
-                esc = 0;
-            }
-            else if (byte == 0x5d && esc) {
-                packet[readBytes] = 0x7d;
-                readBytes++;
-                BCC2^=0x7d;
-                esc = 0;
-            }
-            else if (esc) {
-                packet[readBytes] = byte;
-                readBytes++;
-                esc = 0;
-                BCC2^=byte;
-            }
-            else {
-                packet[readBytes] = byte;
-                readBytes++;
-                BCC2^=byte;
-                esc = 0;
-            }
-        }
-        if (state == END) {
-            if (BCC2 != 0) {
-                unsigned char rej[5];
-                rej[0] = F;
-                rej[1] = A1;
-                if (stateMachine == DATA0) { //I think this makes more sense, no?
-                    rej[2] = Crej0;
-                } else rej[2] = Crej1;
-                rej[3] = rej[1] ^ rej[2];
-                rej[4] = F;
-                writeBytesSerialPort(rej, 5);
-                state = START;
-                BCC2 = 0;
-            }
-            else {
-                unsigned char ack[5];
-                ack[0] = F;
-                ack[1] = A1;
-                ack[2] = stateMachine == DATA0 ? Crr1 : Crr0;
-                ack[3] = ack[1] ^ ack[2];
-                ack[4] = F;
-                writeBytesSerialPort(ack, 5);
-                break;
+            if (state == END) {
+                if (stateMachine == DATA0 || stateMachine == DATA1) {
+                    if (BCC2 != 0) {
+                        unsigned char rejFrame[5];
+                        rejFrame[0] = F;
+                        rejFrame[1] = A1;
+                        rejFrame[2] = stateMachine == DATA0 ? Crej0 : Crej1;
+                        rejFrame[3] = rejFrame[1] ^ rejFrame[2];
+                        rejFrame[4] = F;
+                        writeBytesSerialPort(rejFrame, 5);
+                        state = START;
+                    }
+                    else {
+                        unsigned char ackFrame[5];
+                        ackFrame[0] = F;
+                        ackFrame[1] = A1;
+                        ackFrame[2] = stateMachine == DATA0 ? Crr1 : Crr0;
+                        ackFrame[3] = ackFrame[1] ^ ackFrame[2];
+                        ackFrame[4] = F;
+                        writeBytesSerialPort(ackFrame, 5);
+                        if ((currentFrame == 0 && stateMachine == DATA0) || currentFrame == 1 && stateMachine == DATA1) {
+                            currentFrame++;
+                            currentFrame %= 2;
+                            break;
+                        }
+                        readBytes = 0;
+                        esc = FALSE;
+                    }
+                }
             }
         }
     }
-
     return readBytes;
 }
 
