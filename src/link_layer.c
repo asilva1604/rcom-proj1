@@ -2,6 +2,7 @@
 
 #include "link_layer.h"
 #include "serial_port.h"
+#include <stdio.h>
 
 // MISC
 #define _POSIX_SOURCE 1 // POSIX compliant source
@@ -11,7 +12,7 @@ int attempts = 3;
 int alarmEnabled = FALSE;
 int alarmCount = 0;
 unsigned char BCC2 = 0;
-int currentFrame = 0;
+static int currentFrame = 0; //this needs to be static, no?
 
 #define F 0x7E
 #define A1 0x03
@@ -141,8 +142,7 @@ void updateState(unsigned char byte) {
         break;
     case DATA:
         if (byte == F) {
-            if (BCC2 == 0) state = END;
-            else state = START;
+            state = END;
         }
         break;
     case END:
@@ -266,9 +266,78 @@ int llwrite(const unsigned char *buf, int bufSize)
 ////////////////////////////////////////////////
 int llread(unsigned char *packet)
 {
-    // TODO
+    unsigned char byte;
+    int readBytes = 0;
+    int esc = 0;
+    while (TRUE) {
+        int check = readByteSerialPort(&byte);
+        if (check == -1) {
+            puts("Error on read, returning...\n");
+            return -1;
+        }
+        else if (check == 0) {
+            puts("No byte read, continuing...\n");
+            continue;
+        }
+        puts("1 byte read, processing...\n");
+        updateState(byte);
+        if (state == DATA) {
+            if (byte == 0x7d) {
+                esc = 1;
+            }
+            else if (byte == 0x5e && esc) {
+                packet[readBytes] = 0x7e;
+                readBytes++;
+                BCC2^=0x7e;
+                esc = 0;
+            }
+            else if (byte == 0x5d && esc) {
+                packet[readBytes] = 0x7d;
+                readBytes++;
+                BCC2^=0x7d;
+                esc = 0;
+            }
+            else if (esc) {
+                packet[readBytes] = byte;
+                readBytes++;
+                esc = 0;
+                BCC2^=byte;
+            }
+            else {
+                packet[readBytes] = byte;
+                readBytes++;
+                BCC2^=byte;
+                esc = 0;
+            }
+        }
+        if (state == END) {
+            if (BCC2 != 0) {
+                unsigned char rej[5];
+                rej[0] = F;
+                rej[1] = A1;
+                if (stateMachine == DATA0) { //I think this makes more sense, no?
+                    rej[2] = Crej0;
+                } else rej[2] = Crej1;
+                rej[3] = rej[1] ^ rej[2];
+                rej[4] = F;
+                writeBytesSerialPort(rej, 5);
+                state = START;
+                BCC2 = 0;
+            }
+            else {
+                unsigned char ack[5];
+                ack[0] = F;
+                ack[1] = A1;
+                ack[2] = stateMachine == DATA0 ? Crr1 : Crr0;
+                ack[3] = ack[1] ^ ack[2];
+                ack[4] = F;
+                writeBytesSerialPort(ack, 5);
+                break;
+            }
+        }
+    }
 
-    return 0;
+    return readBytes;
 }
 
 ////////////////////////////////////////////////
