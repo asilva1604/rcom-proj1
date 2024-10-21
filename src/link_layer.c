@@ -319,6 +319,10 @@ int llread(unsigned char *packet)
                         readBytes = 0;
                         esc = FALSE;
                     }
+                } else if (stateMachine == SET) {
+                    unsigned char frameUA[5] = {F,A1,Cua,A1 ^ Cua,F};
+                    writeBytesSerialPort(frameUA, 5);
+                    state = START;
                 }
             }
         }
