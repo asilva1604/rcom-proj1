@@ -184,11 +184,11 @@ int llopen(LinkLayer connectionParameters)
     }
 
     unsigned char frame[5] = {F,A1,0,0,F};
+    unsigned char byte[1];
     if (connectionParameters.role == LlTx) {
         frame[2] = Cset;
         frame[3] = A1 ^ Cset;
 
-        unsigned char byte[1];
         while (alarmCount < attempts)
         {
             if (alarmEnabled == FALSE)
@@ -222,6 +222,26 @@ int llopen(LinkLayer connectionParameters)
     } else {
         frame[2] = Cua;
         frame[3] = A1 ^ Cua;
+
+        while (TRUE) {
+            if (readByteSerialPort(byte) == 1) {
+                updateState(byte[0]);
+                printf("Byte: 0x%02X --> State: %d\n", byte[0], state);
+                if (state == END) {
+                    if (stateMachine == SET) {
+                        // Return good
+                        writeBytesSerialPort(frame, 5);
+                        state = START;
+                        return 1;
+                    }
+                    else {
+                        // RECEIVED NOT SET
+                        printf("WARNING: Received Frame but not SET!\n");
+                    }
+                }
+            }
+        }
+        return -1;
     }
 
     return 1;
