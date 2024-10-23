@@ -409,8 +409,79 @@ int llread(unsigned char *packet)
 ////////////////////////////////////////////////
 int llclose(int showStatistics)
 {
-    // TODO
+    unsigned char discFrame[5] = {F, A1, Cdisc, A1 ^ Cdisc, F};
+    unsigned char uaFrame[5] = {F, A2, Cua, A2 ^ Cua, F};
+    unsigned char byte[1];
 
-    int clstat = closeSerialPort();
-    return clstat;
+    // If transmitter (Tx)
+    if (stateMachine == SEND0 || stateMachine == SEND1)
+    {
+        while (alarmCount < attempts)
+        {
+            if (alarmEnabled == FALSE)
+            {
+                // Send DISC frame
+                int bytes = writeBytesSerialPort(discFrame, 5);
+                printf("%d bytes written (DISC frame)\n", bytes);
+                if (bytes < 5) {
+                    printf("ERROR: bytes written (%d) is less than the packet size (%d)\n", bytes, 5);
+                }
+                alarm(seconds); // Set alarm
+                alarmEnabled = TRUE;
+            }
+
+            // Wait for DISC response from receiver
+            if (readByteSerialPort(byte) == 1)
+            {
+                updateState(byte[0]);
+                printf("Byte: 0x%02X --> State: %d\n", byte[0], state);
+                if (state == END && stateMachine == DISC)
+                {
+                    // Send UA frame to finalize the connection
+                    writeBytesSerialPort(uaFrame, 5);
+                    resetAlarm();
+                    break;
+                }
+            }
+        }
+
+        resetAlarm();
+        return closeSerialPort();
+    }
+
+    // If receiver (Rx)
+    else if (stateMachine == DISC)
+    {
+        while (TRUE)
+        {
+            // Wait for DISC from transmitter
+            if (readByteSerialPort(byte) == 1)
+            {
+                updateState(byte[0]);
+                printf("Byte: 0x%02X --> State: %d\n", byte[0], state);
+                if (state == END && stateMachine == DISC)
+                {
+                    // Send DISC frame back to acknowledge
+                    writeBytesSerialPort(discFrame, 5);
+
+                    // Wait for UA from transmitter
+                    while (TRUE)
+                    {
+                        if (readByteSerialPort(byte) == 1)
+                        {
+                            updateState(byte[0]);
+                            printf("Byte: 0x%02X --> State: %d\n", byte[0], state);
+                            if (state == END && stateMachine == UA)
+                            {
+                                resetAlarm();
+                                return closeSerialPort();
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    return -1;
 }
