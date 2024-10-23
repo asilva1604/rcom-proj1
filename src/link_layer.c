@@ -335,12 +335,17 @@ int llread(unsigned char *packet)
     unsigned char byte[1];
     int readBytes = 0;
     int esc = FALSE;
+    int first = TRUE;
     BCC2 = 0;
     while (TRUE) {
         if (readByteSerialPort(byte) == 1) {
             updateState(byte[0]);
             printf("Byte: 0x%02X --> State: %d\n", byte[0], state);
             if (state == DATA) {
+                if (first) {
+                    first = FALSE;
+                    continue;
+                }
                 if (byte[0] == ESC) {
                     esc = TRUE;
                 }
@@ -358,9 +363,9 @@ int llread(unsigned char *packet)
                 }
             }
             if (state == END) {
+                readBytes--;
                 if (stateMachine == DATA0 || stateMachine == DATA1) {
                     if (BCC2 != 0) {
-                        printf("BCC2 wrong");
                         unsigned char rejFrame[5];
                         rejFrame[0] = F;
                         rejFrame[1] = A1;
@@ -372,6 +377,7 @@ int llread(unsigned char *packet)
                         readBytes = 0;
                         esc = FALSE;
                         BCC2 = 0;
+                        first = TRUE;
                     }
                     else {
                         unsigned char ackFrame[5];

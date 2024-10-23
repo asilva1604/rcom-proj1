@@ -23,7 +23,6 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
     llopen(link);
 
     if (strncmp(role,"tx", 2) == 0) {
-        printf("BBBBBBBBBBBBBBB");
         unsigned char rr[6] = {"AAAAA"};
         for (int i = 0; i < strlen(rr); i++)
         {
@@ -36,9 +35,9 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         //printf("%d\n", strlen(rr));
 
 
-        llread(rr);
+        int j = llread(rr);
         //printf("%d\n", strlen(rr));
-        for (int i = 0; i < strlen(rr); i++)
+        for (int i = 0; i < j; i++)
         {
             printf("%d\n", rr[i]);
         }
