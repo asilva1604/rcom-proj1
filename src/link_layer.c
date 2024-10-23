@@ -69,6 +69,10 @@ int checkBCC1(enum STATE_MACHINE stateMachine, unsigned char byte) {
         return byte == (A1^Crej0);
     case ERROR1:
         return byte == (A1^Crej1);
+    case DATA0:
+        return byte == (A1^Cframe0);
+    case DATA1:
+        return byte == (A1^Cframe1);
     case DISC:
         return byte == (A1^Cdisc);
     
@@ -130,7 +134,7 @@ void updateState(unsigned char byte) {
         else state = START;
         break;
     case C:
-        if ((stateMachine == DATA0 || stateMachine == DATA1) 
+        if (((stateMachine == DATA0) || (stateMachine == DATA1)) 
             && checkBCC1(stateMachine, byte)) state = DATA;
         else if (checkBCC1(stateMachine, byte)) state = BCC;
         else if (byte == F) state = FLAG;
@@ -238,13 +242,13 @@ int llwrite(const unsigned char *buf, int bufSize)
             updateState(byte[0]);
             printf("Byte: 0x%02X --> State: %d\n", byte[0], state);
             if (state == END) {
-                if (currentFrame == 0 && stateMachine == ERROR0 || currentFrame == 1 && stateMachine == ERROR1) {
+                if ((currentFrame == 0 && stateMachine == ERROR0) || (currentFrame == 1 && stateMachine == ERROR1)) {
                     // Send same frame again
                     state = START;
                     alarm(0);
                     alarmEnabled = FALSE;
                     alarmCount = 0;
-                } else if (currentFrame == 0 && stateMachine == SEND1 || currentFrame == 1 && stateMachine == SEND0) {
+                } else if ((currentFrame == 0 && stateMachine == SEND1) || (currentFrame == 1 && stateMachine == SEND0)) {
                     // Return good
                     state = START;
                     alarm(0);
@@ -278,10 +282,10 @@ int llread(unsigned char *packet)
                 if (byte[0] == ESC) {
                     esc = TRUE;
                 }
-                else if (esc && (byte[0] == BStuff ^ F || byte[0] == BStuff ^ ESC)) {
-                    packet[readBytes] = BStuff ^ byte[0];
+                else if (esc && ((byte[0] == (BStuff ^ F)) || (byte[0] == (BStuff ^ ESC)))) {
+                    packet[readBytes] = (BStuff ^ byte[0]);
                     readBytes++;
-                    BCC2 ^= BStuff ^ byte[0];
+                    BCC2 ^= (BStuff ^ byte[0]);
                     esc = FALSE;
                 }
                 else {
@@ -294,6 +298,7 @@ int llread(unsigned char *packet)
             if (state == END) {
                 if (stateMachine == DATA0 || stateMachine == DATA1) {
                     if (BCC2 != 0) {
+                        printf("BCC2 wrong");
                         unsigned char rejFrame[5];
                         rejFrame[0] = F;
                         rejFrame[1] = A1;
@@ -302,6 +307,9 @@ int llread(unsigned char *packet)
                         rejFrame[4] = F;
                         writeBytesSerialPort(rejFrame, 5);
                         state = START;
+                        readBytes = 0;
+                        esc = FALSE;
+                        BCC2 = 0;
                     }
                     else {
                         unsigned char ackFrame[5];
@@ -311,13 +319,11 @@ int llread(unsigned char *packet)
                         ackFrame[3] = ackFrame[1] ^ ackFrame[2];
                         ackFrame[4] = F;
                         writeBytesSerialPort(ackFrame, 5);
-                        if ((currentFrame == 0 && stateMachine == DATA0) || currentFrame == 1 && stateMachine == DATA1) {
+                        if ((currentFrame == 0 && stateMachine == DATA0) || (currentFrame == 1 && stateMachine == DATA1)) {
                             currentFrame++;
                             currentFrame %= 2;
                             break;
                         }
-                        readBytes = 0;
-                        esc = FALSE;
                     }
                 } else if (stateMachine == SET) {
                     unsigned char frameUA[5] = {F,A1,Cua,A1 ^ Cua,F};
