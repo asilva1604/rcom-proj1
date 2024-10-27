@@ -100,6 +100,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         }
 
         // Send control packet
+        packet_size = 0;
         packet[packet_size] = CEnd;
         packet_size++;
         packet[packet_size] = TSize;
@@ -174,42 +175,17 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                 fwrite(packet + 4, sizeof(unsigned char), size, file);
                 break;
             case CEnd:
-                /* code */
-                printf("AAAAAAAAAAAAAAAAAAAA");
-                //fseek(file, 0, SEEK_END);
-                //long fileSize = ftell(file);
-                printf("%ld\n", fileSize);
+                fseek(file, 0, SEEK_END);
+                long fileSize = ftell(file);
                 break;
             default:
                 break;
             }
 
         }
-        printf("BBBBBBBBBBBBBBBBBB");
 
         fclose(file);
         llclose(TRUE);
         return 1;
-    }
-
-    if (strncmp(role,"tx", 2) == 0) {
-        unsigned char rr[6] = {"AAAAA"};
-        for (int i = 0; i < strlen(rr); i++)
-        {
-            printf("%d\n", rr[i]);
-        }
-        
-        llwrite(rr, strlen("AAAAA"));
-    } else {
-        unsigned char rr[6];
-        //printf("%d\n", strlen(rr));
-
-
-        int j = llread(rr);
-        printf("Num of bytes read: %d\n", j);
-        for (int i = 0; i < j; i++)
-        {
-            printf("%d\n", rr[i]);
-        }
     }
 }
