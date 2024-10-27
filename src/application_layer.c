@@ -32,17 +32,39 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         FILE *file = fopen(filename, "r");
 
         if (file == NULL ){
-            perror("Error opening file, not found...");
-            return;
+            printf("ERROR: file %s, not found...", filename);
+            return 1;
         }
 
-        char buffer[MAX_PAYLOAD_SIZE]; //is the size here correct?
+        fseek(file, 0, SEEK_END);
+        long fileSize = ftell(file);
+        rewind(file);  // Reset the file pointer to the beginning
+
+        unsigned char packet[MAX_PAYLOAD_SIZE];
+        int packet_size = 0;
 
         //send control packet
-        buffer[0] = CStart;
-        //write the rest of packet...
+        packet[packet_size] = CStart;
+        packet_size++;
+        packet[packet_size] = TSize;
+        packet_size++;
+        packet[packet_size] = sizeof(long);
+        packet_size++;
+        packet[packet_size] = fileSize;
+        packet_size += sizeof(long);
+        packet[packet_size] = TName;
+        packet_size++;
+        packet[packet_size] = strlen(filename);
+        memcpy(packet + packet_size, filename, strlen(filename));
+        packet_size += strlen(filename);
 
-        while (fgets(buffer, sizeof(buffer), file)) {
+        if (llwrite(packet, packet_size) == -1) {
+            printf("ERROR: max attempts of %d reached", nTries);
+            return 1;
+        }
+
+
+        while (fread(packet + 4, sizeof(unsigned char), sizeof(packet) - 4, file)) {
             //do something
         } 
 
@@ -54,12 +76,12 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         FILE *file = fopen(filename, "w");
 
         if (file == NULL) {
-            perror("Error writing to or creating file...");
-            return;
+            printf("Error writing to or creating file...");
+            return 1;
         }
-        char buffer[MAX_PAYLOAD_SIZE];
+        char packet[MAX_PAYLOAD_SIZE];
         while (TRUE) {
-            int read = llread(&buffer);
+            int read = llread(&packet);
 
         }
 
