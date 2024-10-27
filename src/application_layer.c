@@ -7,6 +7,7 @@
 #include <string.h>
 
 #define CStart 1
+#define CData 2
 #define TSize 0
 #define TName 1
 
@@ -42,6 +43,8 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
 
         unsigned char packet[MAX_PAYLOAD_SIZE];
         int packet_size = 0;
+        int sequenceNumber = 0;
+        unsigned short size = 0;
 
         //send control packet
         packet[packet_size] = CStart;
@@ -63,10 +66,32 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             return 1;
         }
 
+        packet_size = 0;
+        packet[packet_size] = CData;
+        packet_size++;
+        packet[packet_size] = sequenceNumber;
+        sequenceNumber = (sequenceNumber + 1) % 100;
+        packet_size += 3;
+        
+        
 
-        while (fread(packet + 4, sizeof(unsigned char), sizeof(packet) - 4, file)) {
-            //do something
-        } 
+        while (TRUE) {
+            size = fread(packet + 4, sizeof(unsigned char), sizeof(packet) - 4, file);
+
+            if (size <= 0) break;
+
+            packet[1] = sequenceNumber;
+            sequenceNumber = (sequenceNumber + 1) % 100;
+
+            packet[2] = (unsigned char)(size & 0xFF);
+            packet[3] = (unsigned char)((size >> 8) & 0xFF);
+            packet_size += size;
+
+            if (llwrite(packet, packet_size) == -1) {
+                printf("ERROR: max attempts of %d reached", nTries);
+                return 1;
+            }
+        }
 
         fclose(file);
         //send control packet
@@ -80,6 +105,9 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             return 1;
         }
         char packet[MAX_PAYLOAD_SIZE];
+
+        // unsigned short size = (unsigned short)(buffer[1] << 8) | buffer[0];
+
         while (TRUE) {
             int read = llread(&packet);
 
