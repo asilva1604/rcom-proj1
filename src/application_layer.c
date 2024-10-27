@@ -54,7 +54,11 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         packet_size++;
         packet[packet_size] = sizeof(long);
         packet_size++;
-        packet[packet_size] = fileSize;
+
+        for (int i = packet_size; i < packet_size + sizeof(long); ++i) {
+            packet[i] = (fileSize >> (i * 8)) & 0xFF;  // Extract each byte
+        }
+
         packet_size += sizeof(long);
         packet[packet_size] = TName;
         packet_size++;
@@ -120,26 +124,67 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         llclose(TRUE);
         //send control packet
 
-        return;
+        return 1;
     } else {
-        FILE *file = fopen(filename, "w");
-
-        if (file == NULL) {
-            printf("Error writing to or creating file...");
-            return 1;
-        }
+        FILE *file;
         char packet[MAX_PAYLOAD_SIZE];
+        long fileSize;
 
         // unsigned short size = (unsigned short)(buffer[1] << 8) | buffer[0];
-
         while (TRUE) {
             int read = llread(&packet);
 
+            switch (packet[0])
+            {
+            case CStart:
+                int packetIndex = 1;
+
+                while (packetIndex < read) {
+                    switch (packet[packetIndex])
+                    {
+                    case TSize:
+                        packetIndex += 2;
+                        for (int i = packetIndex; i < packet[packetIndex-1]; ++i) {
+                            fileSize |= ((long)packet[i] << (i * 8));
+                        }
+                        packetIndex += packet[packetIndex-1];
+                        break;
+                    case TName:
+                        // ignore, optional
+                        packetIndex += 2;
+                        packetIndex += packet[packetIndex-1];
+                        printf(filename);
+                        break;
+                    default:
+                        packetIndex++;
+                        break;
+                    }
+                }
+
+
+
+                file = fopen(filename, "w");
+
+                if (file == NULL) {
+                    printf("ERROR: unable to write to or create file %s", filename);
+                    return 1;
+                }
+                break;
+            case CData:
+                /* code */
+                break;
+            case CEnd:
+                /* code */
+                break;
+            default:
+                break;
+            }
+
         }
 
-
         fclose(file);
-        return;
+        llclose(TRUE);
+        return 1;
     }
 
     if (strncmp(role,"tx", 2) == 0) {
