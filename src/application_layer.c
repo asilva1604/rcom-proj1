@@ -8,6 +8,7 @@
 
 #define CStart 1
 #define CData 2
+#define CEnd 3
 #define TSize 0
 #define TName 1
 
@@ -94,7 +95,29 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             packet_size = 4;
         }
 
+        // Send control packet
+        packet[packet_size] = CEnd;
+        packet_size++;
+        packet[packet_size] = TSize;
+        packet_size++;
+        packet[packet_size] = sizeof(long);
+        packet_size++;
+        packet[packet_size] = fileSize;
+        packet_size += sizeof(long);
+        packet[packet_size] = TName;
+        packet_size++;
+        packet[packet_size] = strlen(filename);
+        memcpy(packet + packet_size, filename, strlen(filename));
+        packet_size += strlen(filename);
+
+        if (llwrite(packet, packet_size) == -1) {
+            printf("ERROR: max attempts of %d reached", nTries);
+            return 1;
+        }
+
         fclose(file);
+
+        llclose(TRUE);
         //send control packet
 
         return;
