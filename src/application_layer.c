@@ -36,7 +36,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
 
 
         int j = llread(rr);
-        //printf("%d\n", strlen(rr));
+        printf("Num of bytes read: %d\n", j);
         for (int i = 0; i < j; i++)
         {
             printf("%d\n", rr[i]);

@@ -5,15 +5,19 @@
 #include <stdio.h>
 #include <time.h>
 
+#include <signal.h>
+
 // MISC
 #define _POSIX_SOURCE 1 // POSIX compliant source
 
-int seconds = 3;
-int attempts = 3;
+int DEBUG_MODE = FALSE; // Enables more prints
+
+int seconds = 3; // 3 by default
+int attempts = 3; // 3 by default
 int alarmEnabled = FALSE;
 int alarmCount = 0;
 unsigned char BCC2 = 0;
-static int currentFrame = 0;
+static int currentFrame = 0; // Starts at frame 0
 
 static int statFrameSend = 0;
 static int statFrameReceived = 0;
@@ -189,7 +193,7 @@ void alarmHandler(int signal)
     alarmEnabled = FALSE;
     alarmCount++;
 
-    printf("Alarm #%d\n", alarmCount);
+    if (DEBUG_MODE) printf("Alarm #%d\n", alarmCount);
 }
 
 void resetAlarm()
@@ -213,6 +217,12 @@ int llopen(LinkLayer connectionParameters)
 
     startTime = time(NULL);
 
+    attempts = connectionParameters.nRetransmissions;
+    seconds = connectionParameters.timeout;
+
+    // Set alarm function handler
+    (void)signal(SIGALRM, alarmHandler);
+
     unsigned char frame[5] = {F,A1,0,0,F};
     unsigned char byte[1];
     if (connectionParameters.role == LlTx) {
@@ -225,7 +235,7 @@ int llopen(LinkLayer connectionParameters)
             {
                 int bytes = writeBytesSerialPort(frame, 5);
                 statFrameSend++;
-                printf("%d bytes written\n", bytes);
+                if (DEBUG_MODE) printf("%d bytes written\n", bytes);
                 if (bytes < 5) {
                     printf("ERROR: bytes written (%d) is less than the packet size (%d)\n", bytes, 5);
                 }
@@ -234,12 +244,13 @@ int llopen(LinkLayer connectionParameters)
             }
             if (readByteSerialPort(byte) == 1) {
                 updateState(byte[0]);
-                printf("Byte: 0x%02X --> State: %d\n", byte[0], state);
+                if (DEBUG_MODE) printf("Byte: 0x%02X --> State: %d\n", byte[0], state);
                 if (state == END) {
                     statFrameReceived++;
                     if (stateMachine == UA) {
                         // Return good
                         resetAlarm();
+                        printf("Opened serial port connection\n");
                         return 1;
                     } else {
                         // RECEIVED NOT UA
@@ -258,7 +269,7 @@ int llopen(LinkLayer connectionParameters)
         while (TRUE) {
             if (readByteSerialPort(byte) == 1) {
                 updateState(byte[0]);
-                printf("Byte: 0x%02X --> State: %d\n", byte[0], state);
+                if (DEBUG_MODE) printf("Byte: 0x%02X --> State: %d\n", byte[0], state);
                 if (state == END) {
                     statFrameReceived++;
                     if (stateMachine == SET) {
@@ -266,6 +277,7 @@ int llopen(LinkLayer connectionParameters)
                         writeBytesSerialPort(frame, 5);
                         statFrameSend++;
                         state = START;
+                        printf("Opened serial port connection\n");
                         return 1;
                     }
                     else {
@@ -329,7 +341,7 @@ int llwrite(const unsigned char *buf, int bufSize)
         {
             int bytes = writeBytesSerialPort(frame, frameSize);
             statFrameSend++;
-            printf("%d bytes written\n", bytes);
+            if (DEBUG_MODE) printf("%d bytes written\n", bytes);
             if (bytes < frameSize) {
                 printf("ERROR: bytes written (%d) is less than the packet size (%d)\n", bytes, frameSize);
             }
@@ -338,7 +350,7 @@ int llwrite(const unsigned char *buf, int bufSize)
         }
         if (readByteSerialPort(byte) == 1) {
             updateState(byte[0]);
-            printf("Byte: 0x%02X --> State: %d\n", byte[0], state);
+            if (DEBUG_MODE) printf("Byte: 0x%02X --> State: %d\n", byte[0], state);
             if (state == END) {
                 statFrameReceived++;
                 if ((currentFrame == 0 && stateMachine == ERROR0) || (currentFrame == 1 && stateMachine == ERROR1)) {
@@ -350,6 +362,7 @@ int llwrite(const unsigned char *buf, int bufSize)
                     //change frame
                     currentFrame++;
                     currentFrame %= 2;
+                    printf("Writen frame\n");
                     return frameSize - 6; // Size of payload after byte stufing
                 } else {
                     // RECEIVED STRANGE CODE
@@ -375,7 +388,7 @@ int llread(unsigned char *packet)
     while (TRUE) {
         if (readByteSerialPort(byte) == 1) {
             updateState(byte[0]);
-            printf("Byte: 0x%02X --> State: %d\n", byte[0], state);
+            if (DEBUG_MODE) printf("Byte: 0x%02X --> State: %d\n", byte[0], state);
             if (state == DATA) {
                 if (first) {
                     first = FALSE;
@@ -418,6 +431,7 @@ int llread(unsigned char *packet)
                         first = TRUE;
                     }
                     else {
+                        // Return good
                         unsigned char ackFrame[5];
                         ackFrame[0] = F;
                         ackFrame[1] = A1;
@@ -444,6 +458,7 @@ int llread(unsigned char *packet)
             }
         }
     }
+    printf("Read frame\n");
     return readBytes;
 }
 
@@ -463,7 +478,7 @@ int llclose(int showStatistics)
             // Send DISC frame
             int bytes = writeBytesSerialPort(discFrame, 5);
             statFrameSend++;
-            printf("%d bytes written (DISC frame)\n", bytes);
+            if (DEBUG_MODE) printf("%d bytes written (DISC frame)\n", bytes);
             if (bytes < 5) {
                 printf("ERROR: bytes written (%d) is less than the packet size (%d)\n", bytes, 5);
             }
@@ -475,7 +490,7 @@ int llclose(int showStatistics)
         if (readByteSerialPort(byte) == 1)
         {
             updateState(byte[0]);
-            printf("Byte: 0x%02X --> State: %d\n", byte[0], state);
+            if (DEBUG_MODE) printf("Byte: 0x%02X --> State: %d\n", byte[0], state);
             if (state == END) {
                 statFrameReceived++;
                 if (stateMachine == DISC) {
@@ -500,5 +515,6 @@ int llclose(int showStatistics)
         printf("Nº of frames with errors: %ld\n", statFrameError);
         printf("-----------------------------------STATISTICS-----------------------------------\n");
     }
+    printf("Closed serial port connection\n");
     return closeSerialPort();
 }
