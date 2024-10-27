@@ -347,6 +347,9 @@ int llwrite(const unsigned char *buf, int bufSize)
                 } else if ((currentFrame == 0 && stateMachine == SEND1) || (currentFrame == 1 && stateMachine == SEND0)) {
                     // Return good
                     resetAlarm();
+                    //change frame
+                    currentFrame++;
+                    currentFrame %= 2;
                     return frameSize - 6; // Size of payload after byte stufing
                 } else {
                     // RECEIVED STRANGE CODE
