@@ -91,6 +91,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                 printf("ERROR: max attempts of %d reached", nTries);
                 return 1;
             }
+            packet_size = 4;
         }
 
         fclose(file);
