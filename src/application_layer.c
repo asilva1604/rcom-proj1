@@ -127,12 +127,12 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         return 1;
     } else {
         FILE *file;
-        char packet[MAX_PAYLOAD_SIZE];
+        unsigned char packet[MAX_PAYLOAD_SIZE];
         long fileSize;
 
-        // unsigned short size = (unsigned short)(buffer[1] << 8) | buffer[0];
         while (TRUE) {
             int read = llread(&packet);
+            if (read == -1) break;
 
             switch (packet[0])
             {
@@ -161,8 +161,6 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                     }
                 }
 
-
-
                 file = fopen(filename, "w");
 
                 if (file == NULL) {
@@ -171,16 +169,23 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                 }
                 break;
             case CData:
-                /* code */
+                unsigned short size = 0;
+                size = (unsigned short)((packet[3] << 8) | packet[2]);
+                fwrite(packet + 4, sizeof(unsigned char), size, file);
                 break;
             case CEnd:
                 /* code */
+                printf("AAAAAAAAAAAAAAAAAAAA");
+                //fseek(file, 0, SEEK_END);
+                //long fileSize = ftell(file);
+                printf("%ld\n", fileSize);
                 break;
             default:
                 break;
             }
 
         }
+        printf("BBBBBBBBBBBBBBBBBB");
 
         fclose(file);
         llclose(TRUE);

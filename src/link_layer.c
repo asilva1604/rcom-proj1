@@ -70,7 +70,7 @@ int checkBCC1(enum STATE_MACHINE stateMachine, unsigned char byte) {
     case SET:
         return byte == (A1^Cset);
     case UA:
-        return byte == (A1^Cua);
+        return (byte == (A1^Cua)) || (byte == (A2^Cua));
     case SEND0:
         return byte == (A1^Crr0);
     case SEND1:
@@ -133,6 +133,7 @@ void updateState(unsigned char byte) {
             state = C;
         }
         else if (byte == Cdisc) {
+            stateMachine = DISC;
             state = C;
         }
         else if (byte == Cframe0) {
