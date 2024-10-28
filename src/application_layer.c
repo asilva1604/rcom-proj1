@@ -157,7 +157,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                     case TName:
                         // ignore, optional
                         packetIndex += 2;
-                        packetIndex += packet[packetIndex-1];
+                        packetIndex = read;
                         printf(filename);
                         break;
                     default:
@@ -169,7 +169,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                 file = fopen(filename, "w");
 
                 if (file == NULL) {
-                    printf("ERROR: unable to write to or create file %s", filename);
+                    printf("ERROR: unable to write to or create file %s\n", filename);
                     return 1;
                 }
                 break;

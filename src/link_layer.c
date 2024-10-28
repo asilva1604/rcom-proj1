@@ -399,13 +399,13 @@ int llread(unsigned char *packet)
                     esc = TRUE;
                 }
                 else if (esc && ((byte[0] == (BStuff ^ F)) || (byte[0] == (BStuff ^ ESC)))) {
-                    packet[readBytes] = (BStuff ^ byte[0]);
+                    if (readBytes < MAX_PAYLOAD_SIZE) packet[readBytes] = (BStuff ^ byte[0]);
                     readBytes++;
                     BCC2 ^= (BStuff ^ byte[0]);
                     esc = FALSE;
                 }
                 else {
-                    packet[readBytes] = byte[0];
+                    if (readBytes < MAX_PAYLOAD_SIZE) packet[readBytes] = byte[0];
                     readBytes++;
                     BCC2 ^= byte[0];
                     esc = FALSE;
