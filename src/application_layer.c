@@ -12,6 +12,8 @@
 #define TSize 0
 #define TName 1
 
+#define maxPacketSize MAX_PAYLOAD_SIZE
+
 void applicationLayer(const char *serialPort, const char *role, int baudRate,
                       int nTries, int timeout, const char *filename)
 {
@@ -42,7 +44,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         long fileSize = ftell(file);
         rewind(file);  // Reset the file pointer to the beginning
 
-        unsigned char packet[MAX_PAYLOAD_SIZE];
+        unsigned char packet[maxPacketSize];
         int packet_size = 0;
         int sequenceNumber = 0;
         unsigned short size = 0;
@@ -81,7 +83,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         
 
         while (TRUE) {
-            size = fread(packet + 4, sizeof(unsigned char), MAX_PAYLOAD_SIZE - 4, file);
+            size = fread(packet + 4, sizeof(unsigned char), maxPacketSize - 4, file);
 
             if (size <= 0) break;
 
@@ -158,7 +160,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                         // ignore, optional
                         packetIndex += 2;
                         packetIndex = read;
-                        printf(filename);
+                        printf("%s\n", filename);
                         break;
                     default:
                         packetIndex++;

@@ -424,6 +424,7 @@ int llread(unsigned char *packet)
                         rejFrame[3] = rejFrame[1] ^ rejFrame[2];
                         rejFrame[4] = F;
                         writeBytesSerialPort(rejFrame, 5);
+                        if (DEBUG_MODE) printf("Sent reject frame of %d\n", stateMachine == DATA1);
                         statFrameSend++;
                         state = START;
                         readBytes = 0;
