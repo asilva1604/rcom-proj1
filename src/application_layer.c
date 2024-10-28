@@ -81,7 +81,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         
 
         while (TRUE) {
-            size = fread(packet + 4, sizeof(unsigned char), sizeof(packet) - 4, file);
+            size = fread(packet + 4, sizeof(unsigned char), MAX_PAYLOAD_SIZE - 4, file);
 
             if (size <= 0) break;
 
@@ -107,7 +107,11 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         packet_size++;
         packet[packet_size] = sizeof(long);
         packet_size++;
-        packet[packet_size] = fileSize;
+
+        for (int i = packet_size; i < packet_size + sizeof(long); ++i) {
+            packet[i] = (fileSize >> (i * 8)) & 0xFF;  // Extract each byte
+        }
+
         packet_size += sizeof(long);
         packet[packet_size] = TName;
         packet_size++;
@@ -181,7 +185,6 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             default:
                 break;
             }
-
         }
 
         fclose(file);
