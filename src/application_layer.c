@@ -131,11 +131,11 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         llclose(TRUE);
         //send control packet
 
-        return 1;
+        return 0;
     } else {
         FILE *file;
         unsigned char packet[MAX_PAYLOAD_SIZE];
-        long fileSize;
+        long fileSize = 0;
 
         while (TRUE) {
             int read = llread(&packet);
@@ -144,6 +144,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             switch (packet[0])
             {
             case CStart:
+            ;
                 int packetIndex = 1;
 
                 while (packetIndex < read) {
@@ -151,7 +152,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                     {
                     case TSize:
                         packetIndex += 2;
-                        for (int i = packetIndex; i < packet[packetIndex-1]; ++i) {
+                        for (int i = packetIndex; i < packetIndex + packet[packetIndex-1]; ++i) {
                             fileSize |= ((long)packet[i] << (i * 8));
                         }
                         packetIndex += packet[packetIndex-1];
@@ -176,11 +177,13 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                 }
                 break;
             case CData:
+            ;
                 unsigned short size = 0;
                 size = (unsigned short)((packet[3] << 8) | packet[2]);
                 fwrite(packet + 4, sizeof(unsigned char), size, file);
                 break;
             case CEnd:
+            ;
                 fseek(file, 0, SEEK_END);
                 long fileSize = ftell(file);
                 break;
@@ -188,9 +191,19 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                 break;
             }
         }
-
+        fseek(file, 0, SEEK_END);
+        long readSize = ftell(file);
+        fseek(file, 0, SEEK_SET);
+        if (readSize != fileSize) {
+            puts("Read file size, and expected file size are different. Deleting...");
+            printf("Expected: %ld, Read: %ld\n", fileSize, readSize);
+            fclose(file);
+            remove(filename);
+            llclose(TRUE);
+            return 1;
+        }
         fclose(file);
         llclose(TRUE);
-        return 1;
+        return 0;
     }
 }
