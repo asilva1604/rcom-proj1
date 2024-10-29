@@ -10,7 +10,13 @@
 // MISC
 #define _POSIX_SOURCE 1 // POSIX compliant source
 
+
+// --------------Variables that can change--------------
+
 int DEBUG_MODE = FALSE; // Enables more prints
+
+// -----------------------------------------------------
+
 
 int seconds = 3; // 3 by default
 int attempts = 3; // 3 by default
@@ -216,8 +222,6 @@ int llopen(LinkLayer connectionParameters)
         return -1;
     }
 
-    startTime = time(NULL);
-
     attempts = connectionParameters.nRetransmissions;
     seconds = connectionParameters.timeout;
 
@@ -252,6 +256,7 @@ int llopen(LinkLayer connectionParameters)
                         // Return good
                         resetAlarm();
                         printf("Opened serial port connection\n");
+                        startTime = time(NULL);
                         return 1;
                     } else {
                         // RECEIVED NOT UA
@@ -279,6 +284,7 @@ int llopen(LinkLayer connectionParameters)
                         statFrameSend++;
                         state = START;
                         printf("Opened serial port connection\n");
+                        startTime = time(NULL);
                         return 1;
                     }
                     else {
@@ -363,7 +369,7 @@ int llwrite(const unsigned char *buf, int bufSize)
                     //change frame
                     currentFrame++;
                     currentFrame %= 2;
-                    printf("Writen frame\n");
+                    if (DEBUG_MODE) printf("Writen frame\n");
                     return frameSize - 6; // Size of payload after byte stufing
                 } else {
                     // RECEIVED STRANGE CODE
@@ -460,7 +466,7 @@ int llread(unsigned char *packet)
             }
         }
     }
-    printf("Read frame\n");
+    if (DEBUG_MODE) printf("Read frame\n");
     return readBytes;
 }
 
@@ -511,10 +517,10 @@ int llclose(int showStatistics)
     time_t elapsed = time(NULL) - startTime;
     if (showStatistics) {
         printf("-----------------------------------STATISTICS-----------------------------------\n");
-        printf("Excution time: %ld\n", elapsed);
+        printf("Excution time: %ld seconds\n", elapsed);
         printf("Nº of frames sent: %d\n", statFrameSend);
-        printf("Nº of frames received: %ld\n", statFrameReceived);
-        printf("Nº of frames with errors: %ld\n", statFrameError);
+        printf("Nº of frames received: %d\n", statFrameReceived);
+        printf("Nº of received frames with errors: %d\n", statFrameError);
         printf("-----------------------------------STATISTICS-----------------------------------\n");
     }
     printf("Closed serial port connection\n");
