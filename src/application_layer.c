@@ -166,6 +166,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
             switch (packet[0])
             {
             case CStart:
+            ;
                 //Received Start control packet
 
                 int packetIndex = 1;
@@ -201,6 +202,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                 }
                 break;
             case CData:
+            ;
                 //Received Data packet
 
                 unsigned short size = 0;
@@ -214,6 +216,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                 printLoadingBar(fileSize, progress, numDataPackets);
                 break;
             case CEnd:
+            ;
                 //Received End control packet
 
                 fseek(file, 0, SEEK_END);
