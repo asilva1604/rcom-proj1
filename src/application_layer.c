@@ -7,7 +7,7 @@
 
 // --------------Variables that can change--------------
 
-#define maxPacketSize 50 // the maximum size of a packet to send, max value of: MAX_PAYLOAD_SIZE
+#define maxPacketSize 500 // the maximum size of a packet to send, max value of: MAX_PAYLOAD_SIZE
 #define showStatistics TRUE // shows statistics at the end
 
 // -----------------------------------------------------
@@ -21,8 +21,8 @@
 
 void printLoadingBar(long max, long progress, int numDataPackets)
 {
-    printf("\r%.*s", (int)(progress * 50 / max), "##################################################");
-    printf("%.*s", (int)(50 - (progress * 50 / max)), "--------------------------------------------------");
+    printf("\r%.*s", (int)((progress * 30 / max) * 3), u8"██████████████████████████████");
+    printf("%.*s", (int)(30 - (progress * 30 / max)), "-----------------------------");
     printf("[%ld %%]", progress * 100 / max);
     printf(" | Packets: %d", numDataPackets);
     printf(" | Bytes: %ld/%ld", progress, max);
@@ -52,6 +52,8 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         FILE *file = fopen(filename, "r");
         if (file == NULL ){
             printf("ERROR: file %s, not found...\n", filename);
+            // Close serial port
+            llclose(showStatistics);
             return;
         }
         fseek(file, 0, SEEK_END);
@@ -82,6 +84,9 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
 
         if (llwrite(packet, packet_size) == -1) {
             printf("ERROR: max attempts of %d reached\n", nTries);
+            // Close file and serial port
+            fclose(file);
+            llclose(showStatistics);
             return;
         }
 
@@ -113,6 +118,9 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
 
             if (llwrite(packet, packet_size) == -1) {
                 printf("\nERROR: max attempts of %d reached\n", nTries);
+                // Close file and serial port
+                fclose(file);
+                llclose(showStatistics);
                 return;
             }
 
@@ -142,6 +150,9 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
 
         if (llwrite(packet, packet_size) == -1) {
             printf("\nERROR: max attempts of %d reached\n", nTries);
+            // Close file and serial port
+            fclose(file);
+            llclose(showStatistics);
             return;
         }
         printf("\n");
@@ -160,7 +171,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
 
         //Receive packets
         while (TRUE) {
-            int read = llread(&packet);
+            int read = llread(packet);
             if (read == -1) break;
 
             switch (packet[0])
@@ -198,6 +209,8 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                 file = fopen(filename, "w");
                 if (file == NULL) {
                     printf("\nERROR: unable to write to or create file %s\n", filename);
+                    // Close serial port
+                    llclose(showStatistics);
                     return;
                 }
                 break;
@@ -229,6 +242,9 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
                 //Received Unknown packet
 
                 printf("\nERROR: received unknown packet\n");
+                // Close file and serial port
+                fclose(file);
+                llclose(showStatistics);
                 return;
             }
         }

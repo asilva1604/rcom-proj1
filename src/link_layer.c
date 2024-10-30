@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <time.h>
 #include <signal.h>
+#include <unistd.h>
 
 // MISC
 #define _POSIX_SOURCE 1 // POSIX compliant source
@@ -49,6 +50,8 @@ struct stats {
     int statFrameSend;
     int statFrameReceived;
     int statFrameError;
+    int statFrameRetransmissionRej;
+    int statFrameRetransmissionAl;
     time_t startTime;
 };
 
@@ -111,6 +114,7 @@ void updateState(unsigned char byte) {
         else if (byte != F) {
             state = START;
             statistics.statFrameError++;
+            statistics.statFrameReceived++;
         }
         break;
     case A:
@@ -153,10 +157,12 @@ void updateState(unsigned char byte) {
         else if (byte == F) {
             state = FLAG;
             statistics.statFrameError++;
+            statistics.statFrameReceived++;
         }
         else {
             state = START;
             statistics.statFrameError++;
+            statistics.statFrameReceived++;
         }
         break;
     case C:
@@ -166,10 +172,12 @@ void updateState(unsigned char byte) {
         else if (byte == F) {
             state = FLAG;
             statistics.statFrameError++;
+            statistics.statFrameReceived++;
         }
         else {
             state = START;
             statistics.statFrameError++;
+            statistics.statFrameReceived++;
         }
         break;
     case BCC:
@@ -177,6 +185,7 @@ void updateState(unsigned char byte) {
         else {
             state = START;
             statistics.statFrameError++;
+            statistics.statFrameReceived++;
         }
         break;
     case DATA:
@@ -199,6 +208,7 @@ void alarmHandler(int signal)
 {
     alarmEnabled = FALSE;
     alarmCount++;
+    statistics.statFrameRetransmissionAl++;
 
     if (DEBUG_MODE) printf("Alarm #%d\n", alarmCount);
 }
@@ -269,6 +279,8 @@ int llopen(LinkLayer connectionParameters)
         return -1;
 
     } else {
+        statistics.statFrameRetransmissionRej = -1;
+        statistics.statFrameRetransmissionAl = -1;
         frame[2] = Cua;
         frame[3] = A1 ^ Cua;
 
@@ -350,7 +362,7 @@ int llwrite(const unsigned char *buf, int bufSize)
             statistics.statFrameSend++;
             if (DEBUG_MODE) printf("%d bytes written\n", bytes);
             if (bytes < frameSize) {
-                printf("ERROR: bytes written (%d) is less than the packet size (%d)\n", bytes, frameSize);
+                printf("\nERROR: bytes written (%d) is less than the packet size (%d)\n", bytes, frameSize);
             }
             alarm(seconds); // Set alarm to be triggered in seconds
             alarmEnabled = TRUE;
@@ -362,6 +374,7 @@ int llwrite(const unsigned char *buf, int bufSize)
                 statistics.statFrameReceived++;
                 if ((currentFrame == 0 && stateMachine == ERROR0) || (currentFrame == 1 && stateMachine == ERROR1)) {
                     // Send same frame again
+                    statistics.statFrameRetransmissionRej++;
                     resetAlarm();
                 } else if ((currentFrame == 0 && stateMachine == SEND1) || (currentFrame == 1 && stateMachine == SEND0)) {
                     // Return good
@@ -373,7 +386,7 @@ int llwrite(const unsigned char *buf, int bufSize)
                     return frameSize - 6; // Size of payload after byte stufing
                 } else {
                     // RECEIVED STRANGE CODE
-                    printf("WARNING: Received unidentified Frame!\n");
+                    printf("\nWARNING: Received unidentified Frame!\n");
                 }
             }
         }
@@ -478,6 +491,7 @@ int llclose(int showStatistics)
     unsigned char discFrame[5] = {F, A1, Cdisc, A1 ^ Cdisc, F};
     unsigned char uaFrame[5] = {F, A2, Cua, A2 ^ Cua, F};
     unsigned char byte[1];
+    unsigned char badDisconnect = TRUE;
     
     while (alarmCount < attempts)
     {
@@ -505,21 +519,26 @@ int llclose(int showStatistics)
                     // Send UA frame to finalize the connection and close serial port
                     writeBytesSerialPort(uaFrame, 5);
                     statistics.statFrameSend++;
+                    badDisconnect = FALSE;
                     break;
                 } else if (stateMachine == UA) {
                     // Close serial port
+                    badDisconnect = FALSE;
                     break;
                 }
             }
         }
     }
     resetAlarm();
+    if (badDisconnect) printf("ERROR: failed to perform close protocol\n");
     time_t elapsed = time(NULL) - statistics.startTime;
     if (showStatistics) {
         printf("-----------------------------------STATISTICS-----------------------------------\n");
         printf("Excution time: %ld seconds\n", elapsed);
         printf("Nº of frames sent: %d\n", statistics.statFrameSend);
         printf("Nº of frames received: %d\n", statistics.statFrameReceived);
+        if (statistics.statFrameRetransmissionRej != -1) printf("Nº of frame retransmissions due to reject frame: %d\n", statistics.statFrameRetransmissionRej);
+        if (statistics.statFrameRetransmissionAl != -1) printf("Nº of frame retransmissions due to alarm timeout: %d\n", statistics.statFrameRetransmissionAl);
         printf("Nº of received frames with errors: %d\n", statistics.statFrameError);
         printf("-----------------------------------STATISTICS-----------------------------------\n");
     }
