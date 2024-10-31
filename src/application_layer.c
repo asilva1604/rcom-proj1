@@ -7,8 +7,8 @@
 
 // --------------Variables that can change--------------
 
-#define maxPacketSize 500 // the maximum size of a packet to send, max value of: MAX_PAYLOAD_SIZE
-#define showStatistics TRUE // shows statistics at the end
+#define maxDataPacketSize 500 // the maximum size of a data packet to send, value: from 5 to MAX_PAYLOAD_SIZE
+#define showStatistics TRUE // shows statistics at the end, value: TRUE or FALSE
 
 // -----------------------------------------------------
 
@@ -60,7 +60,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         long fileSize = ftell(file);
         rewind(file);  // Reset the file pointer to the beginning
 
-        unsigned char packet[maxPacketSize];
+        unsigned char packet[MAX_PAYLOAD_SIZE];
         int packet_size = 0;
         int sequenceNumber = 0;
         unsigned short size = 0;
@@ -106,7 +106,7 @@ void applicationLayer(const char *serialPort, const char *role, int baudRate,
         
         // Send Data packets
         while (TRUE) {
-            size = fread(packet + 4, sizeof(unsigned char), maxPacketSize - 4, file);
+            size = fread(packet + 4, sizeof(unsigned char), maxDataPacketSize - 4, file);
 
             if (size <= 0) break;
 

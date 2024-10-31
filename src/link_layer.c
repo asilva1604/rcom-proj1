@@ -7,6 +7,14 @@
 #include <signal.h>
 #include <unistd.h>
 
+
+// --------------Variables that can change--------------
+
+int DEBUG_MODE = FALSE; // Enables more prints for debugging, value: TRUE or FALSE
+
+// -----------------------------------------------------
+
+
 // MISC
 #define _POSIX_SOURCE 1 // POSIX compliant source
 #define F 0x7E
@@ -54,14 +62,6 @@ struct stats {
     int statFrameRetransmissionAl;
     time_t startTime;
 };
-
-
-// --------------Variables that can change--------------
-
-int DEBUG_MODE = FALSE; // Enables more prints
-
-// -----------------------------------------------------
-
 
 int seconds = 3; // 3 by default
 int attempts = 3; // 3 by default
