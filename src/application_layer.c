@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <string.h>
 
+
 // --------------Variables that can change--------------
 
 #define maxDataPacketSize 500 // the maximum size of a data packet to send, value: from 5 to MAX_PAYLOAD_SIZE
